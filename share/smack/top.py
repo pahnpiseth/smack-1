@@ -141,6 +141,9 @@ def arguments():
   translate_group.add_argument('--memory-safety', action='store_true', default=False,
     help='enable memory safety checks')
 
+  translate_group.add_argument('--block-on-function-pointer-calls', action='store_true', default=False,
+    help='block execution on paths with function pointer calls')
+
   verifier_group = parser.add_argument_group('verifier options')
 
   verifier_group.add_argument('--verifier',
@@ -387,6 +390,7 @@ def llvm_to_bpl(args):
   if args.no_byte_access_inference: cmd += ['-no-byte-access-inference']
   if args.no_memory_splitting: cmd += ['-no-memory-splitting']
   if args.memory_safety: cmd += ['-memory-safety']
+  if args.block_on_function_pointer_calls: cmd += ['-block-on-function-pointer-calls']
   try_command(cmd, console=True)
   annotate_bpl(args)
 

@@ -46,6 +46,10 @@ const llvm::cl::opt<bool> SmackOptions::NoByteAccessInference(
   "no-byte-access-inference", llvm::cl::desc("Optimize bit-precision with DSA.")
 );
 
+const llvm::cl::opt<bool> SmackOptions::BlockOnFunctionPointerCalls(
+  "block-on-function-pointer-calls", llvm::cl::desc("Block execution on the path with function pointer calls.")
+);
+
 bool SmackOptions::isEntryPoint(std::string name) {
   for (auto EP : EntryPoints)
     if (name == EP)

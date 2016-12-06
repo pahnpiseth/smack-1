@@ -458,6 +458,12 @@ void SmackInstGenerator::visitCallInst(llvm::CallInst& ci) {
     WARN("ignoring llvm.debug call.");
     emit(Stmt::skip());
 
+  } else if (name.find("devirtbounce") != std::string::npos) {
+    if (SmackOptions::BlockOnFunctionPointerCalls && !f->hasFnAttribute("bounce-function-no-targets")) {
+      WARN("blocking on function pointer calls.");
+      emit(Stmt::assume(Expr::lit(false)));
+    }
+
   } else if (name.find(Naming::VALUE_PROC) != std::string::npos) {
     emit(rep.valueAnnotation(ci));
 
