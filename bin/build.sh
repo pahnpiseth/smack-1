@@ -20,11 +20,11 @@
 ################################################################################
 
 # Set these flags to control various installation options
-INSTALL_DEPENDENCIES=1
-BUILD_Z3=1
-BUILD_BOOGIE=1
-BUILD_CORRAL=1
-BUILD_LOCKPWN=1
+INSTALL_DEPENDENCIES=0
+BUILD_Z3=0
+BUILD_BOOGIE=0
+BUILD_CORRAL=0
+BUILD_LOCKPWN=0
 BUILD_SMACK=1
 TEST_SMACK=1
 BUILD_LLVM=0 # LLVM is typically installed from packages (see below)
@@ -272,15 +272,15 @@ then
   ./autogen.sh ${CONFIGURE_INSTALL_PREFIX}
   make get-monolite-latest
   make EXTERNAL_MCS=${PWD}/mcs/class/lib/monolite/gmcs.exe
-  sudo make install
+  sudo make install -j 64
 
   # Install libgdiplus
   cd ${MONO_DIR}
   git clone git://github.com/mono/libgdiplus.git
   cd libgdiplus
   ./autogen.sh ${CONFIGURE_INSTALL_PREFIX}
-  make
-  sudo make install
+  make -j 64
+  sudo make install -j 64
 
   if [[ ${INSTALL_PREFIX} ]]
   then
@@ -309,8 +309,8 @@ then
 
   cd ${LLVM_DIR}/build/
   cmake ${CMAKE_INSTALL_PREFIX} -DCMAKE_BUILD_TYPE=Release ../src
-  make
-  sudo make install
+  make -j 64
+  sudo make install -j 64
 
   puts "Built LLVM"
 fi
@@ -382,8 +382,8 @@ then
   mkdir -p ${SMACK_DIR}/build
   cd ${SMACK_DIR}/build
   cmake ${CMAKE_INSTALL_PREFIX} -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_BUILD_TYPE=Debug ..
-  make
-  sudo make install
+  make -j 64
+  sudo make install -j 64
 
   puts "Configuring shell environment"
   echo export BOOGIE=\"mono ${BOOGIE_DIR}/Binaries/Boogie.exe\" >> ${SMACKENV}

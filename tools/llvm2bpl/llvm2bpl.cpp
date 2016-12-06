@@ -32,6 +32,7 @@
 #include "smack/ExtractContracts.h"
 #include "smack/SimplifyLibCalls.h"
 #include "smack/MemorySafetyChecker.h"
+#include "smack/Filter.h"
 
 static llvm::cl::opt<std::string>
 InputFilename(llvm::cl::Positional, llvm::cl::desc("<input LLVM bitcode file>"),
@@ -130,6 +131,10 @@ int main(int argc, char **argv) {
   if (MemorySafety) {
     pass_manager.add(new smack::MemorySafetyChecker());
   }
+
+
+  pass_manager.add(new smack::Filter());
+  pass_manager.add (llvm::createAlwaysInlinerPass ());
 
   std::vector<tool_output_file*> files;
 

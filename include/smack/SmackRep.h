@@ -120,6 +120,10 @@ public:
   const Stmt* call(llvm::Function* f, const llvm::User& u);
   std::string code(llvm::CallInst& ci);
 
+  void flattenAgTy(llvm::Type* curType, unsigned curOffset, std::list<unsigned>& indices);
+  llvm::Type* getSrcType(const llvm::Value* v);
+  unsigned getMemIntrinsicLength(const llvm::ConstantInt* l);
+
   const Stmt* alloca(llvm::AllocaInst& i);
   const Stmt* memcpy(const llvm::MemCpyInst& msi);
   const Stmt* memset(const llvm::MemSetInst& msi);

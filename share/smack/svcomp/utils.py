@@ -159,6 +159,7 @@ def verify_bpl_svcomp(args):
   command += ["/irreducibleLoopUnroll:2"]
   command += ["/trackAllVars"]
 
+  print " ".join(command)
   verifier_output = smack.top.try_command(command, timeout=time_limit)
   result = smack.top.verification_result(verifier_output)
 

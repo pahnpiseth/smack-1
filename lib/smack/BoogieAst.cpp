@@ -200,6 +200,10 @@ const Stmt* Stmt::code(std::string s) {
   return new CodeStmt(s);
 }
 
+const Stmt* Stmt::compound(std::list<const Stmt*> stmts) {
+  return new CompoundStmt(stmts);
+}
+
 Decl* Decl::typee(std::string name, std::string type) {
   return new TypeDecl(name,type);
 }
@@ -621,6 +625,10 @@ void Block::print(std::ostream& os) const {
   if (name != "")
     os << name << ":" << "\n";
   print_seq<const Stmt*>(os, stmts, "  ", "\n  ", "");
+}
+
+void CompoundStmt::print(std::ostream& os) const {
+  print_seq<const Stmt*>(os, stmts, "", "\n  ", "");
 }
 
 void Program::print(std::ostream& os) const {

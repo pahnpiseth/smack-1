@@ -222,6 +222,10 @@ unsigned SmackRep::offset(llvm::StructType* T, unsigned idx) {
   return targetData->getStructLayout(T)->getElementOffset(idx);
 }
 
+unsigned SmackRep::getMemIntrinsicLength(const llvm::ConstantInt* l) {
+  return l->getValue().getZExtValue();
+}
+
 std::string SmackRep::memReg(unsigned idx) {
   return indexedName(Naming::MEMORY,{idx});
 }
@@ -243,6 +247,29 @@ std::string SmackRep::memPath(unsigned region) {
 bool SmackRep::isExternal(const llvm::Value* v) {
   return v->getType()->isPointerTy()
       && !regions.get(regions.idx(v)).isAllocated();
+}
+
+llvm::Type* SmackRep::getSrcType(const llvm::Value* v) {
+  if (auto c = dyn_cast<BitCastInst>(v)) {
+    DEBUG(errs() << "bc : " << *v << "\n");
+    Type *t = c->getSrcTy();
+    assert(t->isPointerTy());
+    return llvm::cast<PointerType>(t)->getElementType();
+  } else if (auto g = dyn_cast<const GlobalVariable>(v)) {
+    return g->getType()->getElementType();
+  } else if (auto ce = dyn_cast<ConstantExpr>(v)) {
+    if (ce->isCast()) {
+      DEBUG(errs() << "bce : " << *ce->getOperand(0) << "\n");
+      Type *t = ce->getOperand(0)->getType();
+      return llvm::cast<PointerType>(t)->getElementType();
+    }
+    if (ce->isGEPWithNoNotionalOverIndexing()) {
+      if (auto sg = dyn_cast<GlobalVariable>(ce->getOperand(0)))
+        if (sg->isConstant())
+          return llvm::cast<PointerType>(sg->getType())->getElementType();
+    }
+  }
+  return NULL;
 }
 
 const Stmt* SmackRep::alloca(llvm::AllocaInst& i) {
@@ -276,6 +303,55 @@ const Stmt* SmackRep::memcpy(const llvm::MemCpyInst& mci) {
     *aln = mci.getArgOperand(3),
     *vol = mci.getArgOperand(4);
 
+    Type *dt = NULL;
+  Type *st = NULL;
+  dt = getSrcType(dst);
+  st = getSrcType(src);
+  DEBUG(errs() << "id1 : " << dt->getTypeID() << "\n");
+  DEBUG(errs() << "id2 : " << st->getTypeID() << "\n");
+
+  if (dt && st) {
+    std::list <const Stmt*> assigns;
+    assigns.push_back(Stmt::comment(std::string("WARNING: memcpy flattened")));
+
+    if (llvm::isa<llvm::ConstantInt>(len) && !SmackOptions::BitPrecise) {
+      unsigned copiedLen = getMemIntrinsicLength(dyn_cast<const llvm::ConstantInt>(len));
+
+      if (dt->getTypeID() == st->getTypeID()) {
+        if (auto intType = llvm::dyn_cast<llvm::IntegerType>(dt))
+          if (intType->getBitWidth() >> 3 == copiedLen) {
+            assigns.push_back(Stmt::assign(Expr::sel(Expr::id(memReg(r1)), pa(expr(dst), 0UL)),
+                  Expr::sel(Expr::id(memReg(r2)), pa(expr(src), 0UL))));
+            return Stmt::compound(assigns);
+          }
+
+        if (dt->isAggregateType()) {
+          if (storageSize(dt) == copiedLen) {
+            std::list<unsigned> indices;
+            flattenAgTy(dt, 0, indices);
+            for (std::list<unsigned>::iterator i = indices.begin(); i != indices.end(); ++i)
+              assigns.push_back(Stmt::assign(Expr::sel(Expr::id(memReg(r1)), pa(expr(dst), *i)),
+                    Expr::sel(Expr::id(memReg(r2)), pa(expr(src), *i))));
+            return Stmt::compound(assigns);
+          }
+        }
+      }
+      // corner case: copy two byte arrays
+      // wish I could define closure here
+      if (dt->isArrayTy() && st->isArrayTy()) {
+        if (llvm::cast<ArrayType>(dt)->getElementType()->isIntegerTy(8)
+          && llvm::cast<ArrayType>(st)->getElementType()->isIntegerTy(8)) {
+          // it doesn't matter the size then
+          // don't check bound, llvm2bpl is not supposed to do it
+          for (unsigned i = 0; i < copiedLen; ++i)
+            assigns.push_back(Stmt::assign(Expr::sel(Expr::id(memReg(r1)), pa(expr(dst), i)),
+                  Expr::sel(Expr::id(memReg(r2)), pa(expr(src), i))));
+          return Stmt::compound(assigns);
+        }
+      }
+    }
+  }
+
   return Stmt::call(P->getName(), {
     Expr::id(memReg(r1)),
     Expr::id(memReg(r2)),
@@ -287,6 +363,31 @@ const Stmt* SmackRep::memcpy(const llvm::MemCpyInst& mci) {
   }, {memReg(r1)});
 }
 
+void SmackRep::flattenAgTy(llvm::Type* curType, unsigned curOffset, std::list<unsigned>& indices) {
+  if (auto structType = llvm::dyn_cast<llvm::StructType>(curType)) {
+    const llvm::StructLayout* structData = targetData->getStructLayout(structType);
+    for (unsigned ti = 0, elemOffset = curOffset; ti < structType->getNumElements(); ++ti) {
+      elemOffset = curOffset + structData->getElementOffset(ti);
+      llvm::Type* elemType = structType->getElementType(ti);
+      if(!elemType->isAggregateType())
+        indices.push_back(elemOffset);
+      else
+        flattenAgTy(elemType, elemOffset, indices);
+    }
+  }
+
+  if (auto arrayType = llvm::dyn_cast<llvm::ArrayType>(curType)) {
+    llvm::Type* elemType = arrayType->getElementType();
+    for (unsigned ai = 0, elemOffset = curOffset; ai < arrayType->getNumElements(); ++ai) {
+      elemOffset = curOffset + offset(arrayType, ai);
+      if (!elemType->isAggregateType())
+        indices.push_back(elemOffset);
+      else
+        flattenAgTy(elemType, elemOffset, indices);
+    }
+  }
+}
+
 const Stmt* SmackRep::memset(const llvm::MemSetInst& msi) {
   unsigned length;
   if (auto CI = dyn_cast<ConstantInt>(msi.getLength()))
@@ -296,9 +397,6 @@ const Stmt* SmackRep::memset(const llvm::MemSetInst& msi) {
 
   unsigned r = regions.idx(msi.getOperand(0),length);
 
-  const Type* T = regions.get(r).getType();
-  Decl* P = memsetProc(T ? type(T) : intType(8), length);
-  auxDecls[P->getName()] = P;
 
   const Value
     *dst = msi.getArgOperand(0),
@@ -306,6 +404,34 @@ const Stmt* SmackRep::memset(const llvm::MemSetInst& msi) {
     *len = msi.getArgOperand(2),
     *aln = msi.getArgOperand(3),
     *vol = msi.getArgOperand(4);
+
+  Type* dt = getSrcType(dst);
+
+  if (dt && llvm::isa<llvm::ConstantInt>(val) && llvm::isa<llvm::ConstantInt>(len)) {
+    unsigned setLen = getMemIntrinsicLength(dyn_cast<const llvm::ConstantInt>(len));
+    unsigned valLit = getMemIntrinsicLength(dyn_cast<const llvm::ConstantInt>(val));
+    std::list<const Stmt*> assigns;
+    assigns.push_back(Stmt::comment(std::string("WARNING: memset flattened")));
+    
+    // corner case: memset a byte array
+    if ((dt->isArrayTy() && llvm::cast<ArrayType>(dt)->getElementType()->isIntegerTy(8)) ||
+      (setLen == (getSize(dt) >> 3) && valLit == 0)) {
+      if (!dt->isAggregateType())
+        assigns.push_back(Stmt::assign(Expr::sel(Expr::id(memReg(r)), pa(expr(dst), valLit)),
+          Expr::lit(valLit)));
+      else {
+        std::list<unsigned> indices;
+        flattenAgTy(dt, 0, indices);
+        for(std::list<unsigned>::iterator i = indices.begin(); i != indices.end(); ++i)
+          assigns.push_back(Stmt::assign(Expr::sel(Expr::id(memReg(r)), pa(expr(dst), *i)),
+            Expr::lit(valLit)));
+      }
+      return Stmt::compound(assigns);
+    }
+  }
+const Type* T = regions.get(r).getType();
+Decl* P = memsetProc(T ? type(T) : intType(8), length);
+auxDecls[P->getName()] = P;
 
   return Stmt::call(P->getName(), {
     Expr::id(memReg(r)),

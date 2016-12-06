@@ -159,6 +159,7 @@ add_library(smackTranslator STATIC
   include/smack/SmackRep.h
   include/smack/SmackRepFlatMem.h
   include/smack/MemorySafetyChecker.h
+  include/smack/Filter.h
   lib/smack/BoogieAst.cpp
   lib/smack/BplFilePrinter.cpp
   lib/smack/BplPrinter.cpp

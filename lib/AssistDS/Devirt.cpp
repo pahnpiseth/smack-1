@@ -233,6 +233,10 @@ Devirtualize::buildBounce (CallSite CS, std::vector<const Function*>& Targets) {
                                   "devirtbounce",
                                   M);
 
+  // If there were not targets, add a special flag
+  //if (!Targets.size())
+  //  F->addFnAttr("bounce-function-no-targets");
+
   //
   // Set the names of the arguments.
   //
