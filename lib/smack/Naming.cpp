@@ -34,9 +34,11 @@ const std::string Naming::TOP_DECL_PROC = "__SMACK_top_decl";
 const std::string Naming::VALUE_PROC = "__SMACK_value";
 const std::string Naming::RETURN_VALUE_PROC = "__SMACK_return_value";
 const std::string Naming::INITIALIZE_PROC = "$initialize";
+const std::string Naming::GLOBAL_ALLOCS_PROC = "__SMACK_global_allocations";
 const std::string Naming::STATIC_INIT_PROC = "__SMACK_static_init";
 
 const std::string Naming::MEMORY = "$M";
+const std::string Naming::GALLOC = "$galloc";
 const std::string Naming::ALLOC = "$alloc";
 const std::string Naming::FREE = "$free";
 const std::string Naming::LOAD = "$load";
@@ -47,6 +49,7 @@ const std::string Naming::EXTRACT_VALUE = "$extractvalue";
 const std::string Naming::MALLOC = "$malloc";
 
 const std::string Naming::EXTERNAL_ADDR = "$isExternal";
+const std::string Naming::HEAP_BOTTOM = "$HEAP_BOTTOM";
 const std::string Naming::GLOBALS_BOTTOM = "$GLOBALS_BOTTOM";
 const std::string Naming::EXTERNS_BOTTOM = "$EXTERNS_BOTTOM";
 const std::string Naming::MALLOC_TOP = "$MALLOC_TOP";
