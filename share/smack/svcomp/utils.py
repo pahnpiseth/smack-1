@@ -42,7 +42,7 @@ def svcomp_frontend(args):
       sc = sf.read()
     if 'unsigned char b:2' in sc:
       args.bit_precise = True
-      args.bit_precise_pointers = True
+      #args.bit_precise_pointers = True
 
   name, ext = os.path.splitext(os.path.basename(args.input_files[0]))
   svcomp_process_file(args, name, ext)
